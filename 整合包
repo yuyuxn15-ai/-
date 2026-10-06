@@ -1,0 +1,1370 @@
+local WindUI = loadstring(game:HttpGet("https://github.com/Footagesus/WindUI/releases/latest/download/main.lua"))()
+
+local Players          = game:GetService("Players")
+local RunService       = game:GetService("RunService")
+local UserInputService = game:GetService("UserInputService")
+local Lighting         = game:GetService("Lighting")
+local LogService       = game:GetService("LogService")
+
+local LocalPlayer = Players.LocalPlayer
+
+--============================ 卡密时间管理 ============================
+local KEY_TIME_FILE = "SeeScript_TimeData.txt"
+local KEY_DURATION  = 12 * 60 * 60  -- 12小时（秒）
+
+local function getStartTime()
+	local ok, hasFile = pcall(isfile, KEY_TIME_FILE)
+	if ok and hasFile then
+		local ok2, content = pcall(readfile, KEY_TIME_FILE)
+		if ok2 and content then
+			local t = tonumber(content)
+			if t then return t end
+		end
+	end
+	local now = os.time()
+	pcall(function() writefile(KEY_TIME_FILE, tostring(now)) end)
+	return now
+end
+
+local sessionStart = getStartTime()
+
+--============================ 主窗口 ============================
+local Window = WindUI:CreateWindow({
+	Title = "See脚本",
+	Author = "公共脚本 · 请勿倒卖",
+	Folder = "SeeScript",
+	Size = UDim2.fromOffset(580, 460),
+	Transparent = true,
+	Theme = "Dark",
+	SideBarWidth = 180,
+	HasOutline = true,
+	User = { Enabled = false },
+	KeySystem = {
+		Key = {
+			"See-NB666-8392017465",
+			"See-NB666-2910384756",
+			"See-NB666-7465192830",
+			"See-NB666-5039182746",
+			"See-NB666-1728463950",
+			"See-NB666-6394720185",
+			"See-NB666-9051328476",
+			"See-NB666-4186703925",
+			"See-NB666-3570294618",
+			"See-NB666-8245601739",
+		},
+		Note = "公共是免费脚本，请勿倒卖\n卡密有效期 12 小时",
+		URL = "https://jczddyak.html2web.com",
+		SaveKey = true,
+	},
+})
+
+--============================ 配置 ============================
+local CONFIG = {
+	ChestContainers = { "Chests", "IslandContainer" },
+	DebrisFieldName = "DebrisField",
+	CoinNames = { "Metal", "Wood" },
+	BasePosition = Vector3.new(256.10, 154.07, -256.03),
+
+	SignalTowers = {
+		{ Label = "信号塔 1", Path = {"IslandContainer", "RivalRigRadioIsland1", "Radio"} },
+		{ Label = "信号塔 2", Path = {"IslandContainer", "RivalRigRadioIsland2", "Radio"} },
+		{ Label = "信号塔 3", Path = {"IslandContainer", "RivalRigRadioIsland3", "Radio"} },
+	},
+
+	CreatureContainerName = "CreatureContainer",
+
+	Harpoon = { Token = 944711, ToolName = "~sHarpoon" },
+	Magma   = { Token = 12160252, ToolName = "~sMagma Staff" },
+	Sniper  = { Token = 30725992, ToolName = "~sGun", ToolRealName = "Sniper Rifle", CFrameSuffix = "-1" },
+	Raygun  = { Token = 620323, ToolName = "~sGun", ToolRealName = "Raygun", CFrameSuffix = "-1" },
+	Boom    = { Token = 605303, ToolName = "~sBoomstick", ToolRealName = "Boomstick" },
+
+	AttractItems = {
+		{ Key = "Plank",        Label = "木板" },
+		{ Key = "Stool",        Label = "凳子" },
+		{ Key = "BrokenCrate2", Label = "破损木箱2" },
+		{ Key = "Pallet",       Label = "托盘" },
+		{ Key = "Union",        Label = "组合箱" },
+		{ Key = "BrokenCrate",  Label = "破损木箱" },
+		{ Key = "JerryCan1",    Label = "汽油桶" },
+	},
+
+	ESPList = {
+		{ Key = "Engine",      Label = "引擎",     Color = Color3.fromRGB(255, 110, 110) },
+		{ Key = "Pallet",      Label = "托盘",     Color = Color3.fromRGB(110, 255, 130) },
+		{ Key = "OilTank",     Label = "油罐",     Color = Color3.fromRGB(100, 180, 255) },
+		{ Key = "ScrapMetal",  Label = "废金属",   Color = Color3.fromRGB(180, 200, 220) },
+		{ Key = "Union",       Label = "组合箱",   Color = Color3.fromRGB(200, 130, 255) },
+		{ Key = "BrokenCrate", Label = "破损木箱", Color = Color3.fromRGB(255, 200, 100) },
+		{ Key = "Stew1",       Label = "炖菜",     Color = Color3.fromRGB(255, 160, 80) },
+		{ Key = "Sushi1",      Label = "寿司",     Color = Color3.fromRGB(255, 120, 170) },
+		{ Key = "Anchor",      Label = "船锚",     Color = Color3.fromRGB(200, 180, 100) },
+		{ Key = "Propellor",   Label = "螺旋桨",   Color = Color3.fromRGB(120, 220, 200) },
+	},
+
+	DragToken = 435189,
+	DropToken = 435256,
+	DropPosition = "~v0,4,0",
+}
+
+local RemoteFunc
+for _, name in ipairs({ "SocialService", "LogService", "Chat", "LocalizationService" }) do
+	local ok, svc = pcall(function() return game:GetService(name) end)
+	if ok and svc then
+		local rf = svc:FindFirstChild("RemoteFunction")
+		if rf then RemoteFunc = rf; break end
+	end
+end
+
+--============================ Tab 顺序（卡密放第一）============================
+local KeyTab    = Window:Tab({ Title = "卡密" })
+local PlayerTab = Window:Tab({ Title = "玩家" })
+local ChestTab  = Window:Tab({ Title = "宝箱" })
+local TowerTab  = Window:Tab({ Title = "信号塔" })
+local ESPTab    = Window:Tab({ Title = "透视" })
+local AttackTab = Window:Tab({ Title = "攻击" })
+local ItemTab   = Window:Tab({ Title = "物品" })
+
+--============================ 卡密 Tab 内容 ============================
+KeyTab:Paragraph({
+	Title = "See脚本",
+	Desc = "公共是免费脚本，请勿倒卖",
+})
+
+local timePara = KeyTab:Paragraph({
+	Title = "卡密剩余时间",
+	Desc = "正在计算...",
+})
+
+KeyTab:Paragraph({
+	Title = "提示",
+	Desc = "卡密有效期 12 小时，到期后所有功能将自动关闭，需要重新验证卡密。",
+})
+
+--============================ 工具函数 ============================
+local function pushNotify(title, content)
+	WindUI:Notify({
+		Title = title,
+		Content = content or "",
+		Duration = 3,
+	})
+end
+
+local function getHRP()
+	local c = LocalPlayer.Character
+	return c and c:FindFirstChild("HumanoidRootPart")
+end
+
+local function getHum()
+	local c = LocalPlayer.Character
+	return c and c:FindFirstChildOfClass("Humanoid")
+end
+
+local function findBodyPart(creature)
+	if not creature then return nil end
+	local h = creature:FindFirstChild("Head")
+	if h and h:IsA("BasePart") then return h end
+	local r = creature:FindFirstChild("Root")
+	if r and r:IsA("BasePart") then return r end
+	for _, d in ipairs(creature:GetDescendants()) do
+		if d:IsA("BasePart") then return d end
+	end
+	return nil
+end
+
+local function getCreatures()
+	local list = {}
+	local container = workspace:FindFirstChild(CONFIG.CreatureContainerName)
+	if not container then return list end
+	for _, c in ipairs(container:GetChildren()) do
+		if c:FindFirstChild("CreatureID") then
+			table.insert(list, c)
+		end
+	end
+	return list
+end
+
+local function getWorldPos(obj)
+	if not obj then return nil end
+	if obj:IsA("BasePart") then return obj.Position end
+	if obj:IsA("Model") then
+		if obj.PrimaryPart then return obj.PrimaryPart.Position end
+		local ok, p = pcall(function() return obj:GetPivot().Position end)
+		if ok and p then return p end
+	end
+	local cur = obj.Parent
+	while cur and cur ~= workspace do
+		if cur:IsA("BasePart") then return cur.Position end
+		cur = cur.Parent
+	end
+	return nil
+end
+
+local function getHealthInfo(creature)
+	local hum = creature:FindFirstChildOfClass("Humanoid")
+	if hum then return hum.Health, hum.MaxHealth end
+	local h = creature:FindFirstChild("Health")
+	if h and h:IsA("ValueBase") then return h.Value, 100 end
+	return nil, nil
+end
+
+--============================ 范围圈 ============================
+local attackRange = 100
+local showRangeRing = false
+local rangeRingParts = {}
+
+local function destroyRangeRing()
+	for _, p in ipairs(rangeRingParts) do
+		if p and p.Parent then p:Destroy() end
+	end
+	rangeRingParts = {}
+end
+
+local function createRangeRing(radius)
+	destroyRangeRing()
+	local segCount = 48
+	local thickness = 0.4
+	local stepAngle = (math.pi * 2) / segCount
+	local segLen = 2 * radius * math.sin(stepAngle / 2)
+
+	for i = 1, segCount do
+		local angle = (i - 1) * stepAngle
+		local x = math.cos(angle) * radius
+		local z = math.sin(angle) * radius
+
+		local seg = Instance.new("Part")
+		seg.Name = "__RangeRing"
+		seg.Anchored = true
+		seg.CanCollide = false
+		seg.CanQuery = false
+		seg.CanTouch = false
+		seg.Material = Enum.Material.Neon
+		seg.Color = Color3.fromRGB(100, 180, 255)
+		seg.Transparency = 0.15
+		seg.Size = Vector3.new(segLen + 0.05, thickness, thickness)
+		seg.CFrame = CFrame.new(x, -1000, z) * CFrame.Angles(0, -angle, 0)
+		seg.Parent = workspace
+		table.insert(rangeRingParts, seg)
+	end
+end
+
+local function updateRangeRing(pos)
+	local segCount = 48
+	local stepAngle = (math.pi * 2) / segCount
+	for i, seg in ipairs(rangeRingParts) do
+		if seg and seg.Parent then
+			local angle = (i - 1) * stepAngle
+			local x = math.cos(angle) * attackRange
+			local z = math.sin(angle) * attackRange
+			seg.CFrame = CFrame.new(pos.X + x, pos.Y + 0.1, pos.Z + z)
+				* CFrame.Angles(0, -angle, 0)
+		end
+	end
+end
+
+local function isInRange(creature)
+	local hrp = getHRP()
+	if not hrp then return false end
+	local part = findBodyPart(creature)
+	if not part then return false end
+	return (part.Position - hrp.Position).Magnitude <= attackRange
+end
+
+RunService.RenderStepped:Connect(function()
+	if not showRangeRing then return end
+	local hrp = getHRP()
+	if hrp then updateRangeRing(hrp.Position) end
+end)
+
+--============================ 注册所有 Toggle（用于超时重置）============================
+local allToggles = {}
+
+local function regToggle(t)
+	table.insert(allToggles, t)
+	return t
+end
+
+--============================ 玩家 Tab ============================
+PlayerTab:Section({ Title = "辅助功能" })
+
+local infJumpOn = false
+UserInputService.JumpRequest:Connect(function()
+	if not infJumpOn then return end
+	local hum = getHum()
+	if hum then hum:ChangeState(Enum.HumanoidStateType.Jumping) end
+end)
+
+regToggle(PlayerTab:Toggle({
+	Title = "无限跳",
+	Value = false,
+	Callback = function(state)
+		infJumpOn = state
+		pushNotify(state and "无限跳已开启" or "无限跳已关闭")
+	end,
+}))
+
+local noclipOn = false
+RunService.Stepped:Connect(function()
+	if not noclipOn then return end
+	local char = LocalPlayer.Character
+	if not char then return end
+	for _, p in ipairs(char:GetDescendants()) do
+		if p:IsA("BasePart") and p.CanCollide then p.CanCollide = false end
+	end
+end)
+
+regToggle(PlayerTab:Toggle({
+	Title = "穿墙",
+	Value = false,
+	Callback = function(state)
+		noclipOn = state
+		if not state then
+			local char = LocalPlayer.Character
+			if char then
+				for _, p in ipairs(char:GetDescendants()) do
+					if p:IsA("BasePart") then p.CanCollide = true end
+				end
+			end
+		end
+		pushNotify(state and "穿墙已开启" or "穿墙已关闭")
+	end,
+}))
+
+PlayerTab:Section({ Title = "飞行" })
+
+PlayerTab:Button({
+	Title = "开启飞行",
+	Callback = function()
+		local ok, err = pcall(function()
+			loadstring(game:HttpGet("https://raw.githubusercontent.com/FengYu-X/Function/refs/heads/main/fly.lua"))()
+		end)
+		if ok then
+			pushNotify("飞行脚本已加载")
+		else
+			pushNotify("飞行脚本加载失败", tostring(err))
+		end
+	end,
+})
+
+PlayerTab:Section({ Title = "夜视效果" })
+
+local nvOn = false
+local nvOriginal = nil
+
+local function captureLighting()
+	if nvOriginal then return end
+	nvOriginal = {
+		Brightness = Lighting.Brightness,
+		Ambient = Lighting.Ambient,
+		OutdoorAmbient = Lighting.OutdoorAmbient,
+	}
+end
+
+local function applyNV(intensity)
+	captureLighting()
+	local t = math.clamp(intensity, 0, 100) / 100
+	Lighting.Brightness = nvOriginal.Brightness + t * 1.5
+	Lighting.Ambient = nvOriginal.Ambient + Color3.new(t * 0.3, t * 0.3, t * 0.35)
+	Lighting.OutdoorAmbient = nvOriginal.OutdoorAmbient + Color3.new(t * 0.25, t * 0.25, t * 0.3)
+end
+
+local function restoreNV()
+	if not nvOriginal then return end
+	Lighting.Brightness = nvOriginal.Brightness
+	Lighting.Ambient = nvOriginal.Ambient
+	Lighting.OutdoorAmbient = nvOriginal.OutdoorAmbient
+end
+
+local nvStrength = 50
+
+PlayerTab:Input({
+	Title = "夜视强度 (0-100)",
+	Value = "50",
+	Placeholder = "50",
+	Callback = function(text)
+		local v = tonumber(text)
+		if v then
+			nvStrength = math.clamp(v, 0, 100)
+			if nvOn then applyNV(nvStrength) end
+		end
+	end,
+})
+
+regToggle(PlayerTab:Toggle({
+	Title = "夜视开关",
+	Value = false,
+	Callback = function(state)
+		nvOn = state
+		if state then
+			applyNV(nvStrength)
+			pushNotify("夜视已开启", "强度 " .. nvStrength)
+		else
+			restoreNV()
+			pushNotify("夜视已关闭")
+		end
+	end,
+}))
+
+--============================ 宝箱 Tab ============================
+ChestTab:Section({ Title = "状态" })
+
+local chestPara = ChestTab:Paragraph({
+	Title = "宝箱统计",
+	Desc = "正在检测...",
+})
+
+local function getChests()
+	local list = {}
+	for _, name in ipairs(CONFIG.ChestContainers) do
+		local folder = workspace:FindFirstChild(name)
+		if folder then
+			for _, c in ipairs(folder:GetChildren()) do
+				table.insert(list, c)
+			end
+		end
+	end
+	return list
+end
+
+local function findPrompt(obj)
+	if not obj then return nil end
+	if obj:IsA("ProximityPrompt") then return obj end
+	for _, c in ipairs(obj:GetChildren()) do
+		if c:IsA("ProximityPrompt") then return c end
+	end
+	local f = obj:FindFirstChildOfClass("ProximityPrompt")
+	if f then return f end
+	for _, d in ipairs(obj:GetDescendants()) do
+		if d:IsA("ProximityPrompt") then return d end
+	end
+	return nil
+end
+
+local function isChestAvail(chest)
+	local p = findPrompt(chest)
+	if not p then return false end
+	if p.Enabled == false then return false end
+	return true
+end
+
+local function getMetalTargets()
+	local list = {}
+	local field = workspace:FindFirstChild(CONFIG.DebrisFieldName)
+	if not field then return list end
+	for _, child in ipairs(field:GetChildren()) do
+		local found = nil
+		for _, name in ipairs(CONFIG.CoinNames) do
+			local t = child:FindFirstChild(name, true)
+			if t then found = t; break end
+		end
+		if found then table.insert(list, found) end
+	end
+	return list
+end
+
+local function tpTo(pos, exact)
+	local char = LocalPlayer.Character
+	if not char then return false end
+	local hrp = char:FindFirstChild("HumanoidRootPart")
+	if not hrp then return false end
+	if exact then
+		hrp.CFrame = CFrame.new(pos)
+	else
+		hrp.CFrame = CFrame.new(Vector3.new(pos.X, pos.Y + 3, pos.Z))
+	end
+	return true
+end
+
+ChestTab:Section({ Title = "操作" })
+
+ChestTab:Button({
+	Title = "传送到未开宝箱",
+	Callback = function()
+		local chests = getChests()
+		local avail = {}
+		for _, c in ipairs(chests) do
+			if isChestAvail(c) then table.insert(avail, c) end
+		end
+		if #avail == 0 then
+			pushNotify("没有未开宝箱")
+			return
+		end
+		local chest = avail[math.random(1, #avail)]
+		local pos = getWorldPos(findPrompt(chest))
+		if pos then
+			tpTo(pos)
+			pushNotify("已传送到未开宝箱")
+		end
+	end,
+})
+
+local holdOn = false
+local holdThread = nil
+
+regToggle(ChestTab:Toggle({
+	Title = "秒开箱",
+	Value = false,
+	Callback = function(state)
+		holdOn = state
+		local function setHold(v)
+			for _, c in ipairs(getChests()) do
+				local p = findPrompt(c)
+				if p then p.HoldDuration = v end
+			end
+		end
+		if state then
+			setHold(0)
+			if holdThread then task.cancel(holdThread) end
+			holdThread = task.spawn(function()
+				while holdOn do
+					setHold(0)
+					task.wait(1)
+				end
+			end)
+			pushNotify("秒开箱已开启")
+		else
+			if holdThread then task.cancel(holdThread); holdThread = nil end
+			setHold(2)
+			pushNotify("秒开箱已关闭")
+		end
+	end,
+}))
+
+ChestTab:Button({
+	Title = "传送到金币宝箱",
+	Callback = function()
+		local list = getMetalTargets()
+		if #list == 0 then
+			pushNotify("没有金币宝箱")
+			return
+		end
+		local target = list[math.random(1, #list)]
+		local pos = getWorldPos(target)
+		if pos then
+			tpTo(pos)
+			pushNotify("已传送到金币宝箱")
+		end
+	end,
+})
+
+ChestTab:Section({ Title = "基地传送" })
+
+ChestTab:Button({
+	Title = "传送到基地",
+	Callback = function()
+		if tpTo(CONFIG.BasePosition, true) then
+			pushNotify("已传送到基地")
+		end
+	end,
+})
+
+--============================ 信号塔 Tab ============================
+local function findByPath(path)
+	local cur = workspace
+	for _, name in ipairs(path) do
+		cur = cur:FindFirstChild(name)
+		if not cur then return nil end
+	end
+	return cur
+end
+
+local function triggerPrompt(prompt)
+	if not prompt then return end
+	if typeof(fireproximityprompt) == "function" then
+		local ok = pcall(fireproximityprompt, prompt)
+		if ok then return end
+	end
+	local old = prompt.HoldDuration
+	pcall(function() prompt.HoldDuration = 0 end)
+	pcall(function() prompt:InputHoldBegin() end)
+	task.wait(0.1)
+	pcall(function() prompt:InputHoldEnd() end)
+	task.delay(0.5, function()
+		if prompt.Parent then pcall(function() prompt.HoldDuration = old end) end
+	end)
+end
+
+local function findAllPrompts(obj)
+	local list = {}
+	if not obj then return list end
+	for _, d in ipairs(obj:GetDescendants()) do
+		if d:IsA("ProximityPrompt") then table.insert(list, d) end
+	end
+	return list
+end
+
+TowerTab:Section({ Title = "信号塔传送" })
+
+for i, info in ipairs(CONFIG.SignalTowers) do
+	TowerTab:Button({
+		Title = info.Label,
+		Callback = function()
+			local tower = findByPath(info.Path)
+			if not tower then
+				pushNotify("未找到 " .. info.Label)
+				return
+			end
+			local pos = getWorldPos(tower)
+			if pos then
+				tpTo(pos)
+				pushNotify("已传送到 " .. info.Label)
+				task.spawn(function()
+					task.wait(0.35)
+					for _, p in ipairs(findAllPrompts(tower)) do
+						triggerPrompt(p)
+						task.wait(0.15)
+					end
+					pushNotify(info.Label .. " 已尝试自动捡起")
+				end)
+			end
+		end,
+	})
+end
+
+TowerTab:Section({ Title = "实时检测" })
+
+local realtimeTowerOn = false
+local realtimeTowerThread = nil
+local realtimeSeen = {}
+local realtimeQueue = {}
+local realtimeProcessing = false
+
+local function processQueue()
+	if realtimeProcessing then return end
+	realtimeProcessing = true
+	task.spawn(function()
+		while realtimeTowerOn and #realtimeQueue > 0 do
+			local info = table.remove(realtimeQueue, 1)
+			local tower = findByPath(info.Path)
+			if tower then
+				local pos = getWorldPos(tower)
+				if pos then
+					tpTo(pos)
+					pushNotify("实时传送到 " .. info.Label)
+					task.wait(0.35)
+					for _, p in ipairs(findAllPrompts(tower)) do
+						triggerPrompt(p)
+					end
+					local t0 = tick()
+					while realtimeTowerOn and tick() - t0 < 20 do
+						task.wait(0.2)
+						if #findAllPrompts(tower) == 0 then break end
+					end
+				end
+			end
+		end
+		realtimeProcessing = false
+	end)
+end
+
+regToggle(TowerTab:Toggle({
+	Title = "实时检测信号塔",
+	Value = false,
+	Callback = function(state)
+		realtimeTowerOn = state
+		if state then
+			realtimeSeen = {}
+			realtimeThread = task.spawn(function()
+				while realtimeTowerOn do
+					task.wait(0.5)
+					for _, info in ipairs(CONFIG.SignalTowers) do
+						local tower = findByPath(info.Path)
+						if tower and not realtimeSeen[info.Label] then
+							realtimeSeen[info.Label] = true
+							table.insert(realtimeQueue, info)
+						elseif not tower and realtimeSeen[info.Label] then
+							realtimeSeen[info.Label] = nil
+						end
+					end
+					if #realtimeQueue > 0 then processQueue() end
+				end
+			end)
+			pushNotify("实时检测已开启")
+		else
+			if realtimeThread then task.cancel(realtimeThread); realtimeThread = nil end
+			realtimeQueue = {}
+			pushNotify("实时检测已关闭")
+		end
+	end,
+}))
+
+--============================ 透视 Tab ============================
+local espSwitches = {}
+
+local function findESPTargets(name)
+	local list = {}
+	local field = workspace:FindFirstChild(CONFIG.DebrisFieldName)
+	if not field then return list end
+	for _, child in ipairs(field:GetChildren()) do
+		local t = child:FindFirstChild(name, true)
+		if t then table.insert(list, t) end
+	end
+	return list
+end
+
+local function addESPVisual(target, info)
+	if not target or not target.Parent then return nil, nil end
+	local hl = target:FindFirstChild("__ESP_HL")
+	if not hl then
+		hl = Instance.new("Highlight")
+		hl.Name = "__ESP_HL"
+		hl.Adornee = target
+		hl.FillColor = info.Color
+		hl.FillTransparency = 0.5
+		hl.OutlineColor = info.Color
+		hl.OutlineTransparency = 0
+		hl.DepthMode = Enum.HighlightDepthMode.AlwaysOnTop
+		hl.Parent = target
+	end
+	local bb = target:FindFirstChild("__ESP_BB")
+	if not bb then
+		bb = Instance.new("BillboardGui")
+		bb.Name = "__ESP_BB"
+		bb.Size = UDim2.new(0, 180, 0, 24)
+		bb.StudsOffsetWorldSpace = Vector3.new(0, 2.5, 0)
+		bb.AlwaysOnTop = true
+		bb.MaxDistance = 99999
+		bb.Adornee = target
+		local txt = Instance.new("TextLabel")
+		txt.Name = "Label"
+		txt.Size = UDim2.new(1, 0, 1, 0)
+		txt.BackgroundTransparency = 1
+		txt.Text = info.Label
+		txt.Font = Enum.Font.GothamBold
+		txt.TextSize = 14
+		txt.TextColor3 = info.Color
+		txt.TextStrokeTransparency = 0
+		txt.TextStrokeColor3 = Color3.fromRGB(0, 0, 0)
+		txt.Parent = bb
+		bb.Parent = target
+	end
+	return hl, bb
+end
+
+ESPTab:Section({ Title = "物品透视开关" })
+
+for _, item in ipairs(CONFIG.ESPList) do
+	local sw = {
+		Name = item.Key,
+		Label = item.Label,
+		Color = item.Color,
+		Active = false,
+		Items = {},
+		Thread = nil,
+	}
+	espSwitches[item.Key] = sw
+
+	regToggle(ESPTab:Toggle({
+		Title = "透视 " .. item.Label,
+		Value = false,
+		Callback = function(state)
+			sw.Active = state
+			if state then
+				sw.Items = setmetatable({}, {__mode = "k"})
+				sw.Thread = task.spawn(function()
+					while sw.Active do
+						local list = findESPTargets(sw.Name)
+						for _, t in ipairs(list) do
+							if not sw.Items[t] then
+								local hl, bb = addESPVisual(t, sw)
+								if hl and bb then sw.Items[t] = { hl = hl, bb = bb } end
+							end
+						end
+						for t, d in pairs(sw.Items) do
+							if not t.Parent or not d.bb.Parent then
+								if d.hl then d.hl:Destroy() end
+								if d.bb then d.bb:Destroy() end
+								sw.Items[t] = nil
+							end
+						end
+						task.wait(0.4)
+					end
+				end)
+			else
+				if sw.Thread then task.cancel(sw.Thread); sw.Thread = nil end
+				for _, d in pairs(sw.Items) do
+					if d.hl then d.hl:Destroy() end
+					if d.bb then d.bb:Destroy() end
+				end
+				sw.Items = {}
+			end
+		end,
+	}))
+end
+
+task.spawn(function()
+	while true do
+		task.wait(0.15)
+		local hrp = getHRP()
+		if hrp then
+			local myPos = hrp.Position
+			for _, sw in pairs(espSwitches) do
+				if sw.Active then
+					for t, d in pairs(sw.Items) do
+						if t.Parent and d.bb and d.bb.Parent then
+							local pos = getWorldPos(t)
+							if pos then
+								local dist = (myPos - pos).Magnitude
+								local lbl = d.bb:FindFirstChild("Label")
+								if lbl then
+									lbl.Text = ("%s [%dm]"):format(sw.Label, math.floor(dist))
+								end
+							end
+						end
+					end
+				end
+			end
+		end
+	end
+end)
+
+--============================ 攻击 Tab ============================
+AttackTab:Section({ Title = "攻击范围" })
+
+AttackTab:Input({
+	Title = "范围 (格)",
+	Value = "100",
+	Placeholder = "100",
+	Callback = function(text)
+		local v = tonumber(text)
+		if v and v > 0 then
+			attackRange = v
+			if showRangeRing then createRangeRing(attackRange) end
+		end
+	end,
+})
+
+regToggle(AttackTab:Toggle({
+	Title = "显示范围圈",
+	Value = false,
+	Callback = function(state)
+		showRangeRing = state
+		if state then
+			createRangeRing(attackRange)
+		else
+			destroyRangeRing()
+		end
+	end,
+}))
+
+AttackTab:Section({ Title = "生物实时检测" })
+
+local creatureInfo = AttackTab:Paragraph({
+	Title = "范围内生物",
+	Desc = "等待检测...",
+})
+
+task.spawn(function()
+	while true do
+		task.wait(1)
+		local hrp = getHRP()
+		if hrp then
+			local myPos = hrp.Position
+			local list = getCreatures()
+			local lines = {}
+			local count = 0
+			for _, c in ipairs(list) do
+				local hp, maxHp = getHealthInfo(c)
+				local part = findBodyPart(c)
+				if part then
+					local dist = (part.Position - myPos).Magnitude
+					if dist <= attackRange then
+						count += 1
+						if count <= 5 then
+							table.insert(lines, string.format("%s | %d/%d | %.0fm",
+								c.Name, math.floor(hp or 0), math.floor(maxHp or 0), dist))
+						end
+					end
+				end
+			end
+			if count == 0 then
+				creatureInfo:SetDesc("范围内无生物")
+			else
+				creatureInfo:SetDesc(string.format("范围内 %d 个\n%s", count, table.concat(lines, "\n")))
+			end
+		end
+	end
+end)
+
+AttackTab:Section({ Title = "武器杀戮（只打范围内）" })
+
+local function getHandle(name)
+	local c = LocalPlayer.Character
+	if not c then return nil end
+	local t = c:FindFirstChild(name)
+	if t then
+		local h = t:FindFirstChild("Handle")
+		if h then return h end
+	end
+	local bp = LocalPlayer:FindFirstChild("Backpack")
+	if bp then
+		local t2 = bp:FindFirstChild(name)
+		if t2 then return t2:FindFirstChild("Handle") end
+	end
+	return nil
+end
+
+local harpoonOn = false
+regToggle(AttackTab:Toggle({
+	Title = "鱼叉杀戮",
+	Value = false,
+	Callback = function(state)
+		harpoonOn = state
+		if state then
+			task.spawn(function()
+				while harpoonOn do
+					for _, creature in ipairs(getCreatures()) do
+						if isInRange(creature) then
+							task.spawn(function()
+								pcall(function()
+									RemoteFunc:InvokeServer(
+										CONFIG.Harpoon.Token,
+										"ToolReplicator",
+										CONFIG.Harpoon.ToolName,
+										"~sHitEnemy",
+										creature
+									)
+								end)
+							end)
+						end
+					end
+					task.wait(0.1)
+				end
+			end)
+			pushNotify("鱼叉杀戮已开启")
+		else
+			pushNotify("鱼叉杀戮已关闭")
+		end
+	end,
+}))
+
+local magmaOn = false
+regToggle(AttackTab:Toggle({
+	Title = "火山杀戮",
+	Value = false,
+	Callback = function(state)
+		magmaOn = state
+		if state then
+			task.spawn(function()
+				while magmaOn do
+					for _, creature in ipairs(getCreatures()) do
+						if isInRange(creature) then
+							local part = findBodyPart(creature)
+							if part then
+								task.spawn(function()
+									local pos = part.Position
+									local posStr = string.format("~v%.4f,%.4f,%.4f", pos.X, pos.Y, pos.Z)
+									pcall(function()
+										RemoteFunc:InvokeServer(
+											CONFIG.Magma.Token,
+											"ToolReplicator",
+											CONFIG.Magma.ToolName,
+											"~sFire",
+											posStr
+										)
+									end)
+								end)
+							end
+						end
+					end
+					task.wait(0.05)
+				end
+			end)
+			pushNotify("火山杀戮已开启")
+		else
+			pushNotify("火山杀戮已关闭")
+		end
+	end,
+}))
+
+local raycParams = RaycastParams.new()
+raycParams.FilterType = Enum.RaycastFilterType.Include
+raycParams.IgnoreWater = true
+
+local function cframeAttack(creature, cfg)
+	local handle = getHandle(cfg.ToolRealName)
+	if not handle then return end
+	local part = findBodyPart(creature)
+	if not part then return end
+	local camera = workspace.CurrentCamera
+	if not camera then return end
+	local origin = camera.CFrame.Position
+	local dir = part.Position - origin
+	if dir.Magnitude < 0.01 then return end
+	local container = workspace:FindFirstChild(CONFIG.CreatureContainerName)
+	if container then raycParams.FilterDescendantsInstances = { container } end
+	local result = workspace:Raycast(origin, dir, raycParams)
+	local hitPos = result and result.Position or (origin + dir)
+	local lookDir = (hitPos - origin)
+	lookDir = lookDir.Magnitude > 0.01 and lookDir.Unit or Vector3.new(0, 0, 1)
+	local cf = string.format("~f%.4f,%.4f,%.4f:%.4f,%.4f,%.4fZ%s",
+		hitPos.X, hitPos.Y, hitPos.Z, lookDir.X, lookDir.Y, lookDir.Z, cfg.CFrameSuffix)
+	pcall(function()
+		RemoteFunc:InvokeServer(
+			cfg.Token,
+			"ToolReplicator",
+			cfg.ToolName,
+			"~sShoot",
+			handle,
+			"~t{1=" .. cf .. "}"
+		)
+	end)
+end
+
+local sniperOn = false
+regToggle(AttackTab:Toggle({
+	Title = "狙击枪杀戮",
+	Value = false,
+	Callback = function(state)
+		sniperOn = state
+		if state then
+			task.spawn(function()
+				while sniperOn do
+					for _, creature in ipairs(getCreatures()) do
+						if isInRange(creature) then
+							task.spawn(cframeAttack, creature, CONFIG.Sniper)
+						end
+					end
+					task.wait(0.05)
+				end
+			end)
+			pushNotify("狙击枪杀戮已开启")
+		else
+			pushNotify("狙击枪杀戮已关闭")
+		end
+	end,
+}))
+
+local rayOn = false
+regToggle(AttackTab:Toggle({
+	Title = "光线枪杀戮",
+	Value = false,
+	Callback = function(state)
+		rayOn = state
+		if state then
+			task.spawn(function()
+				while rayOn do
+					for _, creature in ipairs(getCreatures()) do
+						if isInRange(creature) then
+							task.spawn(cframeAttack, creature, CONFIG.Raygun)
+						end
+					end
+					task.wait(0.05)
+				end
+			end)
+			pushNotify("光线枪杀戮已开启")
+		else
+			pushNotify("光线枪杀戮已关闭")
+		end
+	end,
+}))
+
+local boomOn = false
+regToggle(AttackTab:Toggle({
+	Title = "Boomstick杀戮",
+	Value = false,
+	Callback = function(state)
+		boomOn = state
+		if state then
+			task.spawn(function()
+				while boomOn do
+					for _, creature in ipairs(getCreatures()) do
+						if isInRange(creature) then
+							task.spawn(function()
+								local handle = getHandle(CONFIG.Boom.ToolRealName)
+								if not handle then return end
+								local hrp = getHRP()
+								if not hrp then return end
+								local part = findBodyPart(creature)
+								if not part then return end
+								local pPos = hrp.Position
+								local tPos = part.Position
+								local s1 = string.format("~v%.4f,%.4f,%.4f", pPos.X, pPos.Y, pPos.Z)
+								local s2 = string.format("~v%.4f,%.4f,%.4f", tPos.X, tPos.Y, tPos.Z)
+								pcall(function()
+									RemoteFunc:InvokeServer(
+										CONFIG.Boom.Token,
+										"ToolReplicator",
+										CONFIG.Boom.ToolName,
+										"~sShoot",
+										s1,
+										s2
+									)
+								end)
+							end)
+						end
+					end
+					task.wait(0.1)
+				end
+			end)
+			pushNotify("Boomstick杀戮已开启")
+		else
+			pushNotify("Boomstick杀戮已关闭")
+		end
+	end,
+}))
+
+--============================ 物品 Tab ============================
+ItemTab:Section({ Title = "拖拽 Plank（服务器）" })
+
+local processedPlanks = setmetatable({}, {__mode = "k"})
+
+local function findPlanks()
+	local list = {}
+	local field = workspace:FindFirstChild(CONFIG.DebrisFieldName)
+	if not field then return list end
+	for _, child in ipairs(field:GetChildren()) do
+		local p = child:FindFirstChild("Plank")
+		if p and p:IsA("BasePart") then table.insert(list, p) end
+	end
+	return list
+end
+
+local function dragPlankFull(plank)
+	if not plank or not plank.Parent then return end
+	if processedPlanks[plank] then return end
+	processedPlanks[plank] = true
+	local rf1 = LogService:FindFirstChild("RemoteFunction")
+	local re1 = LogService:FindFirstChild("RemoteEvent")
+	if not rf1 or not re1 then return end
+	pcall(function()
+		rf1:InvokeServer(CONFIG.DragToken, "AttemptDrag", plank)
+	end)
+	task.wait(0.4)
+	if not plank.Parent then return end
+	pcall(function()
+		re1:FireServer(CONFIG.DropToken, "GiveUpOwnership", plank, CONFIG.DropPosition)
+	end)
+	task.wait(0.1)
+	if plank.Parent then
+		pcall(function() plank.Anchored = true end)
+	end
+end
+
+local dragOn = false
+regToggle(ItemTab:Toggle({
+	Title = "拖拽所有 Plank",
+	Value = false,
+	Callback = function(state)
+		dragOn = state
+		if state then
+			task.spawn(function()
+				while dragOn do
+					for _, p in ipairs(findPlanks()) do
+						task.spawn(dragPlankFull, p)
+					end
+					task.wait(1)
+				end
+			end)
+			pushNotify("拖拽已开启")
+		else
+			pushNotify("拖拽已关闭")
+		end
+	end,
+}))
+
+ItemTab:Button({
+	Title = "强制重新拖拽",
+	Callback = function()
+		processedPlanks = setmetatable({}, {__mode = "k"})
+		for _, p in ipairs(findPlanks()) do
+			task.spawn(dragPlankFull, p)
+		end
+		pushNotify("已强制重新拖拽")
+	end,
+})
+
+ItemTab:Section({ Title = "吸附开关" })
+
+local attractSwitches = {}
+local savedState = setmetatable({}, {__mode = "k"})
+
+local function findItems(name)
+	local list = {}
+	local field = workspace:FindFirstChild(CONFIG.DebrisFieldName)
+	if not field then return list end
+	for _, child in ipairs(field:GetChildren()) do
+		local t = child:FindFirstChild(name)
+		if t and t:IsA("BasePart") then table.insert(list, t) end
+	end
+	return list
+end
+
+for _, item in ipairs(CONFIG.AttractItems) do
+	local sw = { Name = item.Key, Label = item.Label, Active = false }
+	attractSwitches[item.Key] = sw
+
+	regToggle(ItemTab:Toggle({
+		Title = "吸附 " .. item.Label,
+		Value = false,
+		Callback = function(state)
+			sw.Active = state
+			if state then
+				pushNotify("已吸附 " .. item.Label)
+			else
+				pushNotify("已取消 " .. item.Label)
+			end
+		end,
+	}))
+end
+
+RunService.RenderStepped:Connect(function()
+	local hrp = getHRP()
+	if not hrp then return end
+	local myPos = hrp.Position
+	local now = tick()
+
+	for name, sw in pairs(attractSwitches) do
+		if sw.Active then
+			local items = findItems(name)
+			local count = #items
+			for i, item in ipairs(items) do
+				if item.Parent then
+					if savedState[item] == nil then
+						savedState[item] = {
+							Anchored = item.Anchored,
+							CanCollide = item.CanCollide,
+							Massless = item.Massless,
+						}
+					end
+					item.Anchored = true
+					item.CanCollide = false
+					item.Massless = true
+					local angle = (i / count) * math.pi * 2 + now * 2 + (name:byte(1) or 0)
+					local wave = math.sin(now * 1.5 + i) * 1.0
+					local offset = Vector3.new(
+						math.cos(angle) * 6,
+						3 + wave,
+						math.sin(angle) * 6
+					)
+					local target = CFrame.new(myPos + offset)
+					item.CFrame = item.CFrame:Lerp(target, 0.3)
+				end
+			end
+		else
+			for _, item in ipairs(findItems(name)) do
+				local s = savedState[item]
+				if s and item.Parent then
+					item.Anchored = s.Anchored
+					item.CanCollide = s.CanCollide
+					item.Massless = s.Massless
+					savedState[item] = nil
+				end
+			end
+		end
+	end
+end)
+
+ItemTab:Section({ Title = "实时检测" })
+
+local itemDetectPara = ItemTab:Paragraph({
+	Title = "物品数量",
+	Desc = "正在检测...",
+})
+
+task.spawn(function()
+	while true do
+		task.wait(1)
+		local lines = {}
+		for _, item in ipairs(CONFIG.AttractItems) do
+			local list = findItems(item.Key)
+			local sw = attractSwitches[item.Key]
+			local prefix = (sw and sw.Active) and "★" or "·"
+			table.insert(lines, string.format("%s %s: %d", prefix, item.Label, #list))
+		end
+		itemDetectPara:SetDesc(table.concat(lines, "\n"))
+	end
+end)
+
+--============================ 卡密倒计时 + 超时重置 ============================
+local function formatTime(seconds)
+	if seconds <= 0 then return "已过期" end
+	local h = math.floor(seconds / 3600)
+	local m = math.floor((seconds % 3600) / 60)
+	local s = math.floor(seconds % 60)
+	return string.format("%d 小时 %02d 分 %02d 秒", h, m, s)
+end
+
+local function resetAllStates()
+	-- 遍历所有 Toggle 强制关闭（会触发 Callback false，停掉线程 + 恢复状态）
+	for _, t in ipairs(allToggles) do
+		pcall(function()
+			t:SetValue(false)
+		end)
+	end
+
+	-- 兜底：直接关闭状态
+	infJumpOn = false
+	noclipOn = false
+	nvOn = false
+	restoreNV()
+	holdOn = false
+	realtimeTowerOn = false
+	realtimeQueue = {}
+	showRangeRing = false
+	destroyRangeRing()
+	harpoonOn = false
+	magmaOn = false
+	sniperOn = false
+	rayOn = false
+	boomOn = false
+	dragOn = false
+
+	for _, sw in pairs(espSwitches) do
+		sw.Active = false
+		if sw.Thread then task.cancel(sw.Thread); sw.Thread = nil end
+		for _, d in pairs(sw.Items) do
+			if d.hl then d.hl:Destroy() end
+			if d.bb then d.bb:Destroy() end
+		end
+		sw.Items = {}
+	end
+
+	for _, sw in pairs(attractSwitches) do
+		sw.Active = false
+	end
+end
+
+local expired = false
+
+task.spawn(function()
+	while true do
+		task.wait(1)
+		local elapsed = os.time() - sessionStart
+		local remain = KEY_DURATION - elapsed
+
+		pcall(function()
+			timePara:SetDesc(formatTime(remain))
+		end)
+
+		if remain <= 0 and not expired then
+			expired = true
+
+			-- 通知
+			pcall(function()
+				WindUI:Notify({
+					Title = "⚠️ 卡密已过期",
+					Content = "12小时有效期已到，所有功能已关闭，请重新验证卡密",
+					Duration = 10,
+				})
+			end)
+
+			-- 重置所有状态
+			pcall(resetAllStates)
+
+			-- 删除本地时间文件，下次启动强制重新验证
+			pcall(function()
+				if isfile(KEY_TIME_FILE) then
+					delfile(KEY_TIME_FILE)
+				end
+			end)
+
+			task.wait(5)
+			-- 强制踢回卡密验证（销毁窗口）
+			pcall(function()
+				Window:Destroy()
+			end)
+			return
+		end
+	end
+end)
