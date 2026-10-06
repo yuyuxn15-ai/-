@@ -1,1 +1,0 @@
-game:GetService("Players").LocalPlayer:Kick("Our server has detected that you are using non-delivery means to get props, and we will give you a reminder.")
